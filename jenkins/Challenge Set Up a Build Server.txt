@@ -1,0 +1,127 @@
+Challenge: Set Up a Build Server
+In this challenge, you'll create and configure the AWS resources needed to run a build server. 
+
+Once the server is online, you’ll connect it to the Jenkins server.
+
+Overview
+Create the following AWS resources:
+An IAM role that allows full access to AWS Lambda
+A security group that allows SSH traffic from the jenkins-server security group
+An SSH key for connecting to the build server
+An EC2 instance using an Amazon Linux 2023 AMI for the build server. Apply the provided user data to configure the build server
+Add the SSH key to Jenkins as a credential.
+Add the build server as a new node on the Jenkins server.
+Complete all previous challenges before attempting this challenge.
+
+This challenge should take 15 to 20 minutes to complete.
+
+Instructions
+Create an IAM Role
+
+Go to the IAM Console, select Roles, and click Create role.
+For Trusted entity type, keep AWS service selected.
+For Use case, choose EC2, then click Next.
+Search for AWSLambdaFullAccess, check the box next to it, and click Next.
+Name the role ec2-lambda.
+Add a tag with key: Name, value: jenkins.
+Click Create role.
+Create a Security Group
+
+Go to the EC2 Console, select Security Groups, then click Create security group.
+Name it build-server and enter a description like SSH from jenkins-server.
+Under Inbound rules, add a rule:
+Type: SSH
+Source: select Custom, then search and select the Jenkins server's security group.
+Description: SSH from jenkins-server
+Add a tag with key: Name, value: build-server.
+Click Create security group.
+Create a Key Pair
+
+In the EC2 Console, navigate to Key Pairs.
+Click Create key pair.
+Name it build-server, choose ED25519 and PEM format.
+Add a tag with key: Name, value: build-server.
+Download and save the key file safely—you'll need it for the next step.
+Add the SSH Key to Jenkins
+
+From the Jenkins Dashboard, go to: Manage Jenkins → Credentials → (Global) → Add Credentials
+For Kind, choose SSH Username with Private Key.
+Use the following:
+ID: build-server
+Username: ec2-user
+Private Key: Select Enter directly and paste the contents of your PEM file.
+Click OK to save.
+Launch the Build Server (EC2 Instance)
+
+From the EC2 Dashboard, click Launch instance.
+Enter build-server as the instance name.
+Choose Amazon Linux 2023 as the AMI and t2.micro as the instance type.
+Under Key pair, select build-server.
+Under Network settings, choose Select existing security group and attach the build-server security group.
+Under Storage, increase the volume size to 20 GB.
+Expand Advanced details, and:
+Set the IAM instance profile to ec2-lambda
+Paste in the following user data script:
+#!/bin/bash
+set -eux
+
+# Log the installation output
+exec > >(tee /var/log/user-data.log) 2>&1
+
+# Unmount /tmp if already mounted
+umount /tmp || true
+
+# Create the /tmp directory if it doesn't exist
+mkdir -p /tmp
+
+# Backup /etc/fstab
+cp /etc/fstab /etc/fstab-$(date +%s).bak
+
+# Remove any existing /tmp entry (just in case)
+sed -i '/\/tmp/d' /etc/fstab
+
+# Add a new tmpfs entry for /tmp with 4G size
+echo "tmpfs /tmp tmpfs defaults,size=4G 0 0" >> /etc/fstab
+
+# Mount all filesystems in fstab (including /tmp)
+mount -a
+
+# Set correct permissions for /tmp
+chmod 1777 /tmp
+
+# install the ssm-agent
+dnf install --assumeyes \
+    https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+
+# install java and python
+dnf install --assumeyes \
+    java-21-amazon-corretto-headless \
+    python3.12.x86_64
+
+# install development tools
+dnf groupinstall -y "Development Tools"
+
+reboot now
+     8. Click Launch instance.
+
+Connect the Build Server to Jenkins
+
+In the EC2 Console, go to your instance and copy its Private DNS name (for example, ip-10-0-0-123.ec2.internal).
+In Jenkins:
+Go to Manage Jenkins → Nodes
+Set the # of executors on the built-in node to 0 and click Save
+Click New Node
+Enter build-server as the node name, choose Permanent Agent, and click Create.
+Fill out the configuration:
+Description: Amazon Linux 2023
+# of Executors: 4
+Remote root directory: /home/ec2-user
+Labels: lambda
+Usage: Leave default
+Launch method: Launch agents via SSH
+Host: Paste the private DNS name
+Credentials: Select the ec2-user SSH key you added earlier=
+Host Key Verification Strategy: Choose Non verifying verification strategy
+Click Save.
+Wait for the node to connect. Then:
+Select the node → Click Log to verify the connection was successful
