@@ -1,0 +1,70 @@
+Challenge: Connect Jenkins to GitHub
+In this challenge you'll use a webhook to connect Jenkins to a GitHub repository.
+
+The goal is to use push commits in GitHub to trigger a Jenkins job.
+
+Developing a proficiency with this technique is key to developing the CI/CD pipeline in upcoming sections of the course.
+
+Overview
+Create a public GitHub repository and copy its HTTPS URL.
+Create and configure a Jenkins freestyle project that:
+Uses the GitHub repository for source code
+Triggers builds using a GitHub webhook
+Prints the contents of the README.md file
+Configure a webhook in GitHub that notifies Jenkins when a push event occurs.
+Make a change to the GitHub repository to trigger the Jenkins job and review the console output.
+Complete all previous challenges before attempting this challenge.
+
+This challenge should take 15 to 20 minutes to complete.
+
+Instructions
+Create a Public GitHub Repository and Copy the URL
+
+Open GitHub and create a new public repository.
+Name the repository and initialize it with a README file.
+From the repository page, select the Code button.
+Select the HTTPS tab.
+Select the clipboard icon to copy the URL.
+Create and Configure a Jenkins Freestyle Project
+
+Open the Jenkins dashboard.
+Select New Item.
+Enter the name: webhook-test.
+Select Freestyle project, then select OK.
+In the job configuration screen, under Description, enter: Testing the Jenkins webhook.
+Source Code Management
+Select Source Code Management > Git
+Paste the GitHub repository URL into the Repository URL field
+Change the Branch Specifier to */main
+Add a Build Trigger.
+Select Build Triggers.
+Check the box next to GitHub hook trigger for GITScm polling.
+Add a Build Step and save the job.
+Scroll to the Build section.
+Select Add build step > Execute shell.
+Enter the following command: cat README.md
+Select Save.
+Configure the GitHub Webhook
+
+In Jenkins, copy the base URL of your Jenkins server. (Copy it from the browser bar or right-select the Jenkins logo and select Copy link address.)
+In GitHub, go to your repository and select Settings.
+Select Webhooks in the left menu.
+Select Add webhook.
+Paste the Jenkins server URL into the Payload URL field
+At the end of the URL, append /github-webhook/
+Make sure there is a trailing slash!
+Set Content type application/json
+Leave the remaining settings unchanged and select Add webhook
+Trigger the Jenkins Job and Review Output
+
+In GitHub, return to the Code tab of the repository.
+Select the pencil icon to edit the README.md file.
+Make a small change to the file.
+Select Commit changes.
+In Jenkins, go to the webhook-test job.
+Wait for the build to be triggered automatically.
+Once the build finishes, select the dropdown next to the build number and select Console Output.
+Review the output:
+Confirm that the build was triggered by a GitHub push
+Check the Git clone steps and build environment
+Verify that the modified contents of README.md are displayed
