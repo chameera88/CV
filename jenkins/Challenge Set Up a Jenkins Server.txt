@@ -1,0 +1,102 @@
+Challenge: Set Up a Jenkins Server
+In this challenge, you’ll create and configure the AWS resources needed to host a Jenkins server.
+
+The challenge walks through the full setup process, from provisioning infrastructure in AWS to installing and configuring Jenkins with NGINX as a reverse proxy.
+
+Overview
+You will complete  the following steps in this challenge:
+
+Create an IAM role that allows EC2 instances to be accessed via Systems Manager (SSM).
+Create a security group that enables HTTP and HTTPS access to your server.
+Create the Jenkins EC2 instance using an Ubuntu AMI, associate the IAM role and security group, and assign an Elastic IP.
+Install Java, Jenkins, and NGINX using the AWS Systems Manager session.
+Configure NGINX to serve as a reverse proxy for Jenkins.
+Configure Jenkins by unlocking it, installing default plugins, and setting up an admin account.
+This challenge should take 20 to 25 minutes to complete.
+
+Instructions
+Create an IAM Role
+
+In the AWS Console, navigate to the IAM dashboard.
+Select Roles from the sidebar, then choose Create role.
+Select AWS service as the trusted entity, and choose EC2 as the use case.
+Select Next until you reach the name field.
+Name the role ec2-ssm.
+Add a tag: Key = Name, Value = jenkins.
+Select Create role.
+Create a Security Group
+Navigate to the EC2 Dashboard and select Security Groups under Network & Security.
+Select Create Security Group.
+Name the group jenkins-server and add a description like Allow web traffic.
+Keep the default VPC setting.
+Add the following inbound rules:
+HTTP (port 80) from Anywhere (IPv4)
+HTTPS (port 443) from Anywhere (IPv4)
+Leave the outbound rules as-is (allowing all traffic).
+Add a tag: Key = Name, Value = jenkins-server.
+Select Create security group.
+Create the Jenkins EC2 Instance
+On the EC2 Dashboard, select Launch Instance.
+Set the instance name to jenkins-server.
+Choose the AMI: Ubuntu Server 24.04 LTS.
+Choose instance type: t2.micro (eligible for free tier).
+Under Key pair, choose Proceed without a key pair.
+Under Network settings:
+Enable Auto-assign Public IP.
+Select the existing security group: jenkins-server.
+Under Storage, set the root volume size to 20 GB.
+Under Advanced Details, select the IAM role: ec2-ssm.
+Select Launch Instance.
+After launching, allocate a new Elastic IP.
+Associate the Elastic IP with the EC2 instance.
+Install Java, Jenkins, and NGINX
+From the EC2 instance page, select Connect, then use Session Manager to open a terminal session.
+Run sudo --login to switch to the root user.
+Clear the screen with Ctrl+L.
+Copy and run the following commands (in order):
+Add Jenkins repo key and list:
+wget -q -O - https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo apt-key add -
+sudo sh -c 'echo deb https://pkg.jenkins.io/debian-stable binary/ > /etc/apt/sources.list.d/jenkins.list'
+Update packages and install software:
+apt update
+apt install -y openjdk-8-jdk nginx jenkins
+Verify installations:
+systemctl status nginx
+systemctl status jenkins
+Configure NGINX
+In the EC2 Dashboard, copy the Public IPv4 DNS of your instance.
+Open a browser and go to http://<public_dns> — you should see the NGINX welcome page.
+NOTE: Be sure to use http vs https when viewing the public DNS in a browser.
+In your terminal session:
+Remove the default NGINX configuration.
+unlink /etc/nginx/sites-enabled/default
+Add the Jenkins proxy configuration in /etc/nginx/conf.d/jenkins.conf:
+upstream jenkins {
+    server 127.0.0.1:8080;
+}
+
+server {
+    listen 80 default_server;
+    listen [::]:80  default_server;
+    location / {
+        proxy_pass http://jenkins;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+       Test the updated configuration by running nginx -t.
+        Reload NGINX by running systemctl reload nginx.
+
+   4. Refresh the browser. You should now see the Jenkins "Unlock" screen.
+
+ 
+
+Configure Jenkins
+On the Unlock Jenkins page, copy the path to the initial admin password.
+In the terminal, display the password by running cat
+/var/lib/jenkins/secrets/initialAdminPassword.
+Copy the password and paste it into the Unlock Jenkins screen. Select Continue.
+Choose Install suggested plugins.
+After plugins install, fill in the form to create an admin user.
+Accept the default Jenkins URL and select Save and Finish.
+Select Start using Jenkins to complete the setup.
