@@ -1,0 +1,119 @@
+#######################               #############################################
+1. Create IAM role - EC2 --- EC2 with System Manager(ec2-ssm - username)
+2. Create EC2 with security group 
+3. then use AWS connect to access the server ---Connect --- Session Manager ---- Connect
+4. Install Jenkins 
+        
+
+       * wget -O /etc/apt/keyrings/jenkins-keyring.asc \
+       https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key 
+
+       * echo "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc]" \
+       https://pkg.jenkins.io/debian-stable binary/ |tee \
+       /etc/apt/sources.list.d/Jenkins.list > /dev/null
+
+      * apt update 
+      * sudo apt install openjdk-21-jdk -y  nginx    -install JDK & nginx
+      * sudo apt install Jenkins    - install Jenkins
+      * systemctl status nginx --no-pager   - check status 
+      *  systemctl status jenkins --no-pager
+
+5. configure nginx 
+
+    * unlink /etc/nginx/sites-enabled/default  - disable default configuration 
+    * nginx -t  - test nginx   and reload the systemctl reload nginx 
+    * nano /etc/nginx/conf.d/jenkins.conf  then add following 
+
+server {
+    listen 80;
+
+    server_name your_server_ip;  # Replace with actual public IP or domain
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+6. get the admin password 
+   cat /var/lib/jenkins/secrets/initialAdminPassword --- then get the password 
+
+7. click on the "install suggested plugin" to install 
+
+8. then create 1st Admin user 
+
+
+
+############# ec2 instance -another server         ##############################
+
+1. create IAM role - select AWS services ---EC2 -- lambda (ec2-lambda-username)
+2. create security group and add Jenkins security as ssh 
+2. create key pair with .PEM  then download 
+4. open Jenkins ---- select manage Jenkins ---- select global ---Add credentials --- 
+5. then select SSH user name with private key --then under ID (build-server)---Username(server user nameex:-ubuntu) ---select Enter Direct ---then Add --- then add the .PEM private key content 
+5 .create a another server and select created security group and key pair and select IAM role and under userdata add following script 
+
+#!/bin/bash
+set -eux
+
+# Log the installation output
+exec > >(tee /var/log/user-data.log) 2>&1
+
+# Unmount /tmp if already mounted
+umount /tmp || true
+
+# Create the /tmp directory if it doesn't exist
+mkdir -p /tmp
+
+# Backup /etc/fstab
+cp /etc/fstab /etc/fstab-$(date +%s).bak
+
+# Remove any existing /tmp entry (just in case)
+sed -i '/\/tmp/d' /etc/fstab
+
+# Add a new tmpfs entry for /tmp with 4G size
+echo "tmpfs /tmp tmpfs defaults,size=4G 0 0" >> /etc/fstab
+
+# Mount all filesystems in fstab (including /tmp)
+mount -a
+
+# Set correct permissions for /tmp
+chmod 1777 /tmp
+
+# install the ssm-agent
+dnf install --assumeyes \
+    https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+
+# install java and python
+dnf install --assumeyes \
+    java-21-amazon-corretto-headless \
+    python3.12.x86_64
+
+# install development tools
+dnf groupinstall -y "Development Tools"
+
+reboot now
+
+
+#################### Connect Jenkins Server to another server #####################
+1.Access Jenkins ----setting ---Manage Jenkins---Nodes
+2. select Built-In-Node ----setting--Number of executors should be 0 ---- save
+3. then again access nodes ---New Node---Add Node Name--Check the "Permanent Agent" ---Create
+4. Number of executors(4)----Remote root directory(/home/ubuntu)--Labels(lambda)---Lunch Method(Lunch Agent via SSH)---Host (private DNS name from AWS) ---credentials(ubuntu)----Non verify---Save 
+5. Finally check the logs --if not install JDK then install it
+
+
+##########  Connect Jenkins to GitHub (Webhook) ################################
+1. Access Jenkins---New Items ---Enter Item Name --Select FreeStyle Project --Add Description
+2. Then Move to Source Code Management Section --Then select Git ---Enter URL for repository(github--select repo--select code--https URL)
+3. Then change Branch Specifier as [*/main]
+4. Then Move to Trigger section ---select GitHub hook trigger for GITScm polling  [Poll SCM -by enable this get periodically get changes]
+5. Then Move to Build Steps --- then Add build step --Executive Shell  ---cat ……..filename...…(ex:)
+
+ Then move to GitHub Side
+6. Click on the Jenkins logo and get "copy link address"
+7. then setting --- webhook ----Add webhook
+8. Payload are add (Jenkins URL/github-webhook/) ---- then application/json
